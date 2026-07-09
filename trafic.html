@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STMU — Smart Traffic Management for Urban Congestion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ============================================
+   DESIGN TOKENS
+   ============================================ */
+:root {
+  --bg-primary: #080C18;
+  --bg-secondary: #0D1428;
+  --bg-card: rgba(13,20,40,0.8);
+  --bg-glass: rgba(0,212,255,0.04);
+  --cyan: #00D4FF;
+  --cyan-dim: rgba(0,212,255,0.15);
+  --cyan-glow: rgba(0,212,255,0.4);
+  --green: #00FF88;
+  --green-dim: rgba(0,255,136,0.12);
+  --green-glow: rgba(0,255,136,0.35);
+  --amber: #FFB547;
+  --red: #FF4757;
+  --text-primary: #E8F4FD;
+  --text-secondary: #7A9AB8;
+  --text-muted: #4A6580;
+  --border: rgba(0,212,255,0.12);
+  --border-bright: rgba(0,212,255,0.35);
+  --grid-line: rgba(0,212,255,0.05);
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+  --radius: 12px;
+  --radius-lg: 20px;
+  --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+[data-theme="light"] {
+  --bg-primary: #F0F6FF;
+  --bg-secondary: #E4EEF8;
+  --bg-card: rgba(255,255,255,0.85);
+  --bg-glass: rgba(0,100,180,0.05);
+  --cyan: #006FBF;
+  --cyan-dim: rgba(0,111,191,0.12);
+  --cyan-glow: rgba(0,111,191,0.3);
+  --green: #007A45;
+  --green-dim: rgba(0,122,69,0.1);
+  --green-glow: rgba(0,122,69,0.3);
+  --text-primary: #0A1628;
+  --text-secondary: #3A5A80;
+  --text-muted: #7A9AB8;
+  --border: rgba(0,111,191,0.15);
+  --border-bright: rgba(0,111,191,0.4);
+  --grid-line: rgba(0,111,191,0.06);
+}
+
+/* ============================================
+   RESET & BASE
+   ============================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--cyan-dim); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5%;
+  height: 68px;
+  background: rgba(8,12,24,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+[data-theme="light"] nav { background: rgba(240,246,255,0.88); }
+
+.nav-logo {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--cyan);
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+.nav-logo span { color: var(--green); }
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  list-style: none;
+}
+.nav-links a {
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color var(--transition);
+}
+.nav-links a:hover { color: var(--cyan); }
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.theme-toggle {
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: var(--transition);
+}
+.theme-toggle:hover { border-color: var(--cyan); color: var(--cyan); }
+
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 4px;
+}
+.hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition: var(--transition);
+}
+
+.mobile-menu {
+  display: none;
+  position: fixed;
+  top: 68px; left: 0; right: 0;
+  background: rgba(8,12,24,0.97);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  z-index: 999;
+  padding: 1.5rem 5%;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.mobile-menu.open { display: flex; }
+.mobile-menu a { text-decoration: none; color: var(--text-primary); font-size: 1rem; font-weight: 500; }
+
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .hamburger { display: flex; }
+}
+
+/* ============================================
+   HERO
+   ============================================ */
+#hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 100px 5% 60px;
+}
+
+/* City grid canvas */
+#cityCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.65;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  max-width: 900px;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cyan);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-bright);
+  padding: 5px 14px;
+  border-radius: 100px;
+  margin-bottom: 1.5rem;
+  background: var(--cyan-dim);
+}
+.hero-eyebrow::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5.5vw, 4.2rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
+}
+.hero-title .accent { color: var(--cyan); }
+.hero-title .accent2 { color: var(--green); }
+
+.hero-sub {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  color: var(--text-secondary);
+  max-width: 680px;
+  margin: 0 auto 2.5rem;
+  line-height: 1.7;
+}
+
+.hero-ctas {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--cyan);
+  color: #080C18;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 12px 28px;
+  border-radius: 8px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 0 24px var(--cyan-glow);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 32px var(--cyan-glow); }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 12px 28px;
+  border-radius: 8px;
+  text-decoration: none;
+  border: 1px solid var(--border-bright);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-secondary:hover { background: var(--cyan-dim); border-color: var(--cyan); transform: translateY(-2px); }
+
+.hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: 3rem;
+  margin-top: 4rem;
+  flex-wrap: wrap;
+}
+.stat-item { text-align: center; }
+.stat-num {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--cyan);
+  display: block;
+}
+.stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* ============================================
+   SECTIONS COMMON
+   ============================================ */
+section {
+  padding: 90px 5%;
+}
+.section-inner { max-width: 1180px; margin: 0 auto; }
+
+.section-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--green);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.section-eyebrow::before { content: '//'; color: var(--text-muted); }
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.section-desc {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  max-width: 600px;
+  line-height: 1.7;
+}
+
+/* ============================================
+   CARD BASE
+   ============================================ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(16px);
+  transition: var(--transition);
+}
+.card:hover {
+  border-color: var(--border-bright);
+  box-shadow: 0 0 32px var(--cyan-glow), 0 8px 32px rgba(0,0,0,0.4);
+  transform: translateY(-4px);
+}
+
+/* ============================================
+   PROBLEM STATEMENT
+   ============================================ */
+#problem { background: var(--bg-secondary); }
+
+.problem-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+
+.problem-card {
+  padding: 1.75rem 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.problem-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--red), transparent);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.problem-card:hover::after { opacity: 1; }
+.problem-card:hover { border-color: rgba(255,71,87,0.3); transform: translateY(-3px); }
+
+.problem-icon { font-size: 2rem; margin-bottom: 1rem; }
+.problem-card h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary); }
+.problem-card p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; }
+.problem-stat {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--red);
+  margin-top: 0.75rem;
+  padding: 3px 8px;
+  background: rgba(255,71,87,0.1);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* ============================================
+   SOLUTION OVERVIEW
+   ============================================ */
+#solution {}
+
+.solution-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+  margin-top: 3rem;
+}
+
+@media (max-width: 768px) { .solution-layout { grid-template-columns: 1fr; gap: 2.5rem; } }
+
+.solution-steps { display: flex; flex-direction: column; gap: 1rem; }
+
+.step-item {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.step-item.active, .step-item:hover {
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+  box-shadow: 0 0 20px var(--cyan-glow);
+}
+.step-num {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--cyan);
+  background: var(--cyan-dim);
+  border: 1px solid var(--border-bright);
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+.step-item.active .step-num { background: var(--cyan); color: #080C18; }
+.step-content h4 { font-family: var(--font-display); font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; }
+.step-content p { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; }
+
+.flow-diagram {
+  position: relative;
+}
+.flow-diagram svg { width: 100%; height: auto; }
+
+/* ============================================
+   KEY FEATURES
+   ============================================ */
+#features { background: var(--bg-secondary); }
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+
+.feature-card {
+  padding: 1.75rem;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(135deg, var(--cyan-dim) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.feature-card:hover::before { opacity: 1; }
+
+.feature-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem;
+  margin-bottom: 1.1rem;
+  background: var(--cyan-dim);
+  border: 1px solid var(--border);
+}
+.feature-card h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; margin-bottom: 0.6rem; }
+.feature-card p { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6; }
+.feature-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--green);
+  background: var(--green-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   ARCHITECTURE
+   ============================================ */
+#architecture {}
+
+.arch-container {
+  margin-top: 3rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  backdrop-filter: blur(12px);
+  overflow: auto;
+}
+.arch-svg-wrap { min-width: 600px; }
+
+/* ============================================
+   LIVE DASHBOARD
+   ============================================ */
+#dashboard { background: var(--bg-secondary); }
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--green);
+  background: var(--green-dim);
+  border: 1px solid rgba(0,255,136,0.25);
+  padding: 5px 12px;
+  border-radius: 100px;
+}
+.live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 1.5s infinite;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 900px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 550px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+.metric-card {
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 60px; height: 60px;
+  background: radial-gradient(circle at 100% 0, var(--cyan-glow), transparent 70%);
+  opacity: 0.4;
+}
+.metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
+.metric-value {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--cyan);
+  line-height: 1;
+}
+.metric-unit { font-size: 0.75rem; color: var(--text-secondary); margin-left: 3px; }
+.metric-trend {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  margin-top: 0.5rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.trend-up { color: var(--green); background: var(--green-dim); }
+.trend-dn { color: var(--red); background: rgba(255,71,87,0.1); }
+.trend-ok { color: var(--amber); background: rgba(255,181,71,0.1); }
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+@media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } }
+
+.chart-card {
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+}
+.chart-card h4 { font-family: var(--font-display); font-size: 0.9rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-secondary); }
+.chart-wrap { position: relative; height: 180px; }
+.doughnut-wrap { position: relative; height: 180px; display: flex; align-items: center; justify-content: center; }
+
+/* Emergency alert */
+.alert-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  font-size: 0.83rem;
+}
+.alert-icon { font-size: 1.2rem; flex-shrink: 0; }
+.alert-text { font-family: var(--font-display); font-weight: 500; }
+.alert-time { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); }
+
+/* ============================================
+   BENEFITS / KPI
+   ============================================ */
+#benefits {}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+
+.kpi-card {
+  padding: 2rem 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  text-align: center;
+  transition: var(--transition);
+}
+.kpi-card:hover {
+  border-color: var(--green);
+  box-shadow: 0 0 28px var(--green-glow);
+  transform: translateY(-4px);
+}
+.kpi-num {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--green);
+  display: block;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+.kpi-desc { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+.kpi-icon { font-size: 2rem; margin-bottom: 1rem; display: block; }
+
+/* ============================================
+   TECH STACK
+   ============================================ */
+#tech { background: var(--bg-secondary); }
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 3rem;
+}
+
+.tech-card {
+  padding: 1.5rem;
+  text-align: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  transition: var(--transition);
+  cursor: default;
+}
+.tech-card:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 20px var(--cyan-glow);
+  transform: translateY(-3px);
+}
+.tech-icon { font-size: 2.2rem; margin-bottom: 0.75rem; display: block; }
+.tech-card h4 { font-family: var(--font-display); font-size: 0.9rem; font-weight: 600; margin-bottom: 0.35rem; }
+.tech-card p { font-size: 0.78rem; color: var(--text-secondary); }
+
+/* ============================================
+   USE CASES
+   ============================================ */
+#usecases {}
+
+.uc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+.uc-card {
+  padding: 1.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.uc-card::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--cyan-glow), transparent 70%);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.uc-card:hover::before { opacity: 1; }
+.uc-card:hover { border-color: var(--border-bright); transform: translateY(-4px); }
+.uc-icon { font-size: 2rem; margin-bottom: 1rem; display: block; }
+.uc-card h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+.uc-card p { font-size: 0.83rem; color: var(--text-secondary); line-height: 1.6; }
+
+/* ============================================
+   ROADMAP
+   ============================================ */
+#roadmap { background: var(--bg-secondary); }
+
+.roadmap-track {
+  position: relative;
+  margin-top: 3.5rem;
+}
+.roadmap-track::before {
+  content: '';
+  position: absolute;
+  left: 24px; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--cyan), var(--green));
+}
+
+.roadmap-item {
+  display: flex;
+  gap: 2rem;
+  padding: 1.5rem 1.5rem 1.5rem 0;
+  position: relative;
+}
+.roadmap-dot {
+  width: 50px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 4px;
+}
+.roadmap-dot-inner {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  border: 3px solid var(--cyan);
+  box-shadow: 0 0 12px var(--cyan-glow);
+  transition: var(--transition);
+}
+.roadmap-item:hover .roadmap-dot-inner {
+  background: var(--cyan);
+  transform: scale(1.3);
+}
+.roadmap-body {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  transition: var(--transition);
+  backdrop-filter: blur(12px);
+}
+.roadmap-item:hover .roadmap-body { border-color: var(--border-bright); }
+.roadmap-phase {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--cyan);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+.roadmap-body h4 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+.roadmap-body p { font-size: 0.83rem; color: var(--text-secondary); line-height: 1.6; }
+
+/* ============================================
+   CONTACT
+   ============================================ */
+#contact {}
+
+.contact-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: start;
+  margin-top: 3rem;
+}
+@media (max-width: 768px) { .contact-layout { grid-template-columns: 1fr; } }
+
+.contact-info h3 { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin-bottom: 1rem; }
+.contact-info p { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; margin-bottom: 2rem; }
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  margin-bottom: 0.75rem;
+  transition: var(--transition);
+  backdrop-filter: blur(12px);
+}
+.contact-item:hover { border-color: var(--cyan); }
+.contact-item-icon { font-size: 1.4rem; }
+.contact-item-text .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.15rem; }
+.contact-item-text .value { font-family: var(--font-display); font-weight: 500; font-size: 0.9rem; }
+
+.contact-map {
+  margin-top: 1.25rem;
+  height: 160px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  overflow: hidden;
+  position: relative;
+}
+.contact-map svg { width: 100%; height: 100%; position: absolute; inset: 0; }
+
+.contact-form { display: flex; flex-direction: column; gap: 1rem; }
+
+.form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.form-group label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; }
+.form-group input, .form-group textarea, .form-group select {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  outline: none;
+  transition: var(--transition);
+  backdrop-filter: blur(12px);
+}
+.form-group input:focus, .form-group textarea:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-dim);
+}
+.form-group textarea { min-height: 120px; resize: vertical; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+
+/* ============================================
+   FOOTER
+   ============================================ */
+footer {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  padding: 60px 5% 30px;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 3rem;
+  max-width: 1180px;
+  margin: 0 auto 3rem;
+}
+@media (max-width: 768px) { .footer-grid { grid-template-columns: 1fr 1fr; gap: 2rem; } }
+@media (max-width: 500px) { .footer-grid { grid-template-columns: 1fr; } }
+
+.footer-brand p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.7; margin: 0.75rem 0 1.25rem; max-width: 280px; }
+.social-links { display: flex; gap: 0.6rem; }
+.social-link {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  text-decoration: none;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+.social-link:hover { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); }
+
+.footer-col h5 { font-family: var(--font-display); font-size: 0.9rem; font-weight: 600; margin-bottom: 1.1rem; color: var(--text-primary); }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.footer-col ul a { text-decoration: none; font-size: 0.85rem; color: var(--text-secondary); transition: color var(--transition); }
+.footer-col ul a:hover { color: var(--cyan); }
+
+.footer-bottom {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.footer-bottom p { font-size: 0.8rem; color: var(--text-muted); }
+.footer-bottom a { color: var(--cyan); text-decoration: none; }
+
+/* ============================================
+   SCROLL ANIMATIONS
+   ============================================ */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-5 { transition-delay: 0.5s; }
+
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
+#progress-bar {
+  position: fixed;
+  top: 0; left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan), var(--green));
+  z-index: 9999;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+/* ============================================
+   UTILITY
+   ============================================ */
+.text-cyan { color: var(--cyan); }
+.text-green { color: var(--green); }
+.text-mono { font-family: var(--font-mono); }
+
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 0;
+}
+
+</style>
+</head>
+<body>
+
+<!-- Progress Bar -->
+<div id="progress-bar" style="width:0%"></div>
+
+<!-- NAVIGATION -->
+<nav id="navbar">
+  <a href="#hero" class="nav-logo">ST<span>MU</span></a>
+  <ul class="nav-links">
+    <li><a href="#problem">Problem</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#dashboard">Dashboard</a></li>
+    <li><a href="#tech">Technology</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">☀️</button>
+    <a href="#contact" class="btn-primary" style="padding:8px 18px;font-size:0.82rem;">Get Demo</a>
+    <button class="hamburger" id="hamburger" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile Menu -->
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#problem" onclick="closeMobile()">Problem</a>
+  <a href="#features" onclick="closeMobile()">Features</a>
+  <a href="#dashboard" onclick="closeMobile()">Dashboard</a>
+  <a href="#tech" onclick="closeMobile()">Technology</a>
+  <a href="#roadmap" onclick="closeMobile()">Roadmap</a>
+  <a href="#contact" onclick="closeMobile()">Contact</a>
+</div>
+
+<!-- HERO -->
+<section id="hero">
+  <canvas id="cityCanvas"></canvas>
+  <div class="hero-content">
+    <div class="hero-eyebrow">AI-Powered Urban Intelligence System</div>
+    <h1 class="hero-title">
+      Smart Traffic<br>
+      <span class="accent">Management System</span><br>
+      <span class="accent2">for Urban Congestion</span>
+    </h1>
+    <p class="hero-sub">Leveraging AI, IoT Sensors, and Real-Time Analytics to Reduce Traffic Congestion and Improve Urban Mobility.</p>
+    <div class="hero-ctas">
+      <a href="#dashboard" class="btn-primary">▶ View Demo Dashboard</a>
+      <a href="#solution" class="btn-secondary">Learn More ↓</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-item">
+        <span class="stat-num" data-count="30">0</span>
+        <span class="stat-label">% Less Congestion</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num" data-count="1200">0</span>
+        <span class="stat-label">Sensors Deployed</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num" data-count="99">0</span>
+        <span class="stat-label">% System Uptime</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num" data-count="48">0</span>
+        <span class="stat-label">City Intersections</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- PROBLEM STATEMENT -->
+<section id="problem">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">Urban Challenges</p>
+    <h2 class="section-title reveal">The Problem We're<br>Solving</h2>
+    <p class="section-desc reveal">Modern cities face an escalating traffic crisis. Without intelligent intervention, congestion costs billions annually and threatens public health and emergency services.</p>
+    <div class="problem-grid">
+      <div class="problem-card reveal reveal-delay-1">
+        <div class="problem-icon">🚗</div>
+        <h3>Traffic Gridlock</h3>
+        <p>Urban commuters lose an average of 54 hours per year stuck in traffic jams during peak hours.</p>
+        <div class="problem-stat">↑ 22% YoY Increase</div>
+      </div>
+      <div class="problem-card reveal reveal-delay-2">
+        <div class="problem-icon">⛽</div>
+        <h3>Fuel Waste</h3>
+        <p>Idling in congestion burns up to 3.9 billion gallons of extra fuel each year globally.</p>
+        <div class="problem-stat">$87B Annual Cost</div>
+      </div>
+      <div class="problem-card reveal reveal-delay-3">
+        <div class="problem-icon">🌫️</div>
+        <h3>Air Pollution</h3>
+        <p>Traffic congestion is responsible for 30% of urban CO₂ emissions and elevated NO₂ levels.</p>
+        <div class="problem-stat">↑ 30% CO₂ Emissions</div>
+      </div>
+      <div class="problem-card reveal reveal-delay-4">
+        <div class="problem-icon">🚑</div>
+        <h3>Delayed Emergency Response</h3>
+        <p>Congested roads increase emergency vehicle response time by 3–7 minutes, costing lives.</p>
+        <div class="problem-stat">+4.6 min Avg Delay</div>
+      </div>
+      <div class="problem-card reveal reveal-delay-5">
+        <div class="problem-icon">💸</div>
+        <h3>Economic Losses</h3>
+        <p>Urban traffic congestion costs the global economy over $1 trillion annually in lost productivity.</p>
+        <div class="problem-stat">$1T+ Annual Loss</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUTION OVERVIEW -->
+<section id="solution">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">How It Works</p>
+    <h2 class="section-title reveal">Intelligent Traffic<br>at Every Layer</h2>
+    <div class="solution-layout">
+      <div class="solution-steps">
+        <div class="step-item active reveal reveal-delay-1">
+          <div class="step-num">01</div>
+          <div class="step-content">
+            <h4>Sensor Data Collection</h4>
+            <p>IoT traffic sensors and inductive loops at intersections capture vehicle counts, speeds, and density every 100ms.</p>
+          </div>
+        </div>
+        <div class="step-item reveal reveal-delay-2">
+          <div class="step-num">02</div>
+          <div class="step-content">
+            <h4>Camera-Based Vehicle Flow Monitoring</h4>
+            <p>CCTV cameras with computer vision track vehicle types, occupancy rates, and incident events in real time.</p>
+          </div>
+        </div>
+        <div class="step-item reveal reveal-delay-3">
+          <div class="step-num">03</div>
+          <div class="step-content">
+            <h4>AI Congestion Pattern Analysis</h4>
+            <p>Deep learning models process multi-source data streams to predict congestion 15–30 minutes ahead with 94% accuracy.</p>
+          </div>
+        </div>
+        <div class="step-item reveal reveal-delay-4">
+          <div class="step-num">04</div>
+          <div class="step-content">
+            <h4>Dynamic Signal Control</h4>
+            <p>Adaptive signal controllers adjust green-phase timing every cycle based on real-time demand, reducing wait times by up to 35%.</p>
+          </div>
+        </div>
+        <div class="step-item reveal reveal-delay-5">
+          <div class="step-num">05</div>
+          <div class="step-content">
+            <h4>Real-Time Recommendations</h4>
+            <p>Commuters and fleet operators receive optimized route guidance via mobile apps and dynamic message signs.</p>
+          </div>
+        </div>
+      </div>
+      <div class="flow-diagram reveal">
+        <svg viewBox="0 0 380 420" xmlns="http://www.w3.org/2000/svg" id="flowSvg">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#00D4FF" opacity="0.7"/>
+            </marker>
+            <filter id="glow2">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- Nodes -->
+          <!-- IoT -->
+          <rect x="120" y="10" width="140" height="50" rx="10" fill="rgba(0,212,255,0.1)" stroke="#00D4FF" stroke-width="1.5" filter="url(#glow2)"/>
+          <text x="190" y="31" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="600">IoT Sensors</text>
+          <text x="190" y="48" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">1,200+ Data Points</text>
+          <!-- Camera -->
+          <rect x="10" y="100" width="140" height="50" rx="10" fill="rgba(0,212,255,0.07)" stroke="rgba(0,212,255,0.4)" stroke-width="1"/>
+          <text x="80" y="121" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="600">CCTV Cameras</text>
+          <text x="80" y="138" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Computer Vision AI</text>
+          <!-- Edge -->
+          <rect x="230" y="100" width="140" height="50" rx="10" fill="rgba(0,212,255,0.07)" stroke="rgba(0,212,255,0.4)" stroke-width="1"/>
+          <text x="300" y="121" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="600">Edge Devices</text>
+          <text x="300" y="138" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Local Pre-Processing</text>
+          <!-- Cloud -->
+          <rect x="100" y="195" width="180" height="55" rx="10" fill="rgba(0,255,136,0.08)" stroke="rgba(0,255,136,0.5)" stroke-width="1.5" filter="url(#glow2)"/>
+          <text x="190" y="218" text-anchor="middle" fill="#00FF88" font-family="Space Grotesk" font-size="11" font-weight="600">Cloud Platform</text>
+          <text x="190" y="234" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">AI Analytics Engine</text>
+          <text x="190" y="244" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="8">5G · Big Data · ML</text>
+          <!-- Control -->
+          <rect x="30" y="300" width="145" height="50" rx="10" fill="rgba(0,212,255,0.07)" stroke="rgba(0,212,255,0.4)" stroke-width="1"/>
+          <text x="103" y="321" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="600">Traffic Control</text>
+          <text x="103" y="338" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Adaptive Signal Mgmt</text>
+          <!-- Mobile -->
+          <rect x="205" y="300" width="145" height="50" rx="10" fill="rgba(0,212,255,0.07)" stroke="rgba(0,212,255,0.4)" stroke-width="1"/>
+          <text x="277" y="321" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="600">Mobile / Dashboard</text>
+          <text x="277" y="338" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Commuter Alerts</text>
+          <!-- Citizens -->
+          <rect x="100" y="385" width="180" height="28" rx="8" fill="rgba(0,212,255,0.05)" stroke="rgba(0,212,255,0.25)" stroke-width="1"/>
+          <text x="190" y="403" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="10">Urban Citizens &amp; Fleet Ops</text>
+
+          <!-- Arrows -->
+          <line x1="150" y1="60" x2="90" y2="100" stroke="#00D4FF" stroke-width="1.2" opacity="0.5" marker-end="url(#arr)"/>
+          <line x1="230" y1="60" x2="300" y2="100" stroke="#00D4FF" stroke-width="1.2" opacity="0.5" marker-end="url(#arr)"/>
+          <line x1="80" y1="150" x2="150" y2="195" stroke="rgba(0,212,255,0.4)" stroke-width="1.2" marker-end="url(#arr)"/>
+          <line x1="300" y1="150" x2="240" y2="195" stroke="rgba(0,212,255,0.4)" stroke-width="1.2" marker-end="url(#arr)"/>
+          <line x1="140" y1="250" x2="100" y2="300" stroke="rgba(0,255,136,0.5)" stroke-width="1.2" marker-end="url(#arr)"/>
+          <line x1="240" y1="250" x2="280" y2="300" stroke="rgba(0,255,136,0.5)" stroke-width="1.2" marker-end="url(#arr)"/>
+          <line x1="103" y1="350" x2="140" y2="385" stroke="rgba(0,212,255,0.35)" stroke-width="1.2" marker-end="url(#arr)"/>
+          <line x1="277" y1="350" x2="240" y2="385" stroke="rgba(0,212,255,0.35)" stroke-width="1.2" marker-end="url(#arr)"/>
+
+          <!-- Animated pulse dots -->
+          <circle r="3" fill="#00D4FF" opacity="0.8">
+            <animateMotion dur="2.5s" repeatCount="indefinite">
+              <mpath href="#path1"/>
+            </animateMotion>
+          </circle>
+          <path id="path1" d="M150,60 L90,100 L150,195 L140,250 L100,300" fill="none"/>
+
+          <circle r="3" fill="#00FF88" opacity="0.8">
+            <animateMotion dur="3s" repeatCount="indefinite" begin="0.8s">
+              <mpath href="#path2"/>
+            </animateMotion>
+          </circle>
+          <path id="path2" d="M230,60 L300,100 L240,195 L240,250 L280,300" fill="none"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KEY FEATURES -->
+<section id="features">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">Capabilities</p>
+    <h2 class="section-title reveal">Built for Every<br>Traffic Challenge</h2>
+    <div class="features-grid">
+      <div class="feature-card card reveal reveal-delay-1">
+        <div class="feature-icon">🧠</div>
+        <h3>AI-Based Traffic Prediction</h3>
+        <p>LSTM and transformer models predict congestion 30 minutes ahead with 94% accuracy using historical and live sensor feeds.</p>
+        <div class="feature-tag">MACHINE LEARNING</div>
+      </div>
+      <div class="feature-card card reveal reveal-delay-2">
+        <div class="feature-icon">📊</div>
+        <h3>Real-Time Monitoring Dashboard</h3>
+        <p>A unified control-room interface for operators showing live traffic density maps, signal states, and anomaly alerts.</p>
+        <div class="feature-tag">LIVE DATA</div>
+      </div>
+      <div class="feature-card card reveal reveal-delay-3">
+        <div class="feature-icon">🚦</div>
+        <h3>Dynamic Traffic Signal Control</h3>
+        <p>Adaptive signal phase and timing that responds to actual demand rather than fixed schedules, cutting intersection wait times by 35%.</p>
+        <div class="feature-tag">ADAPTIVE CONTROL</div>
+      </div>
+      <div class="feature-card card reveal reveal-delay-4">
+        <div class="feature-icon">🚨</div>
+        <h3>Emergency Vehicle Priority Routing</h3>
+        <p>Automatic green-wave corridor creation for ambulances, fire trucks, and police — reducing emergency response time by 40%.</p>
+        <div class="feature-tag">LIFE SAFETY</div>
+      </div>
+      <div class="feature-card card reveal reveal-delay-5">
+        <div class="feature-icon">🛑</div>
+        <h3>Accident Detection System</h3>
+        <p>Computer vision analyzes camera feeds to detect incidents in under 8 seconds and automatically alerts dispatch and reroutes traffic.</p>
+        <div class="feature-tag">COMPUTER VISION</div>
+      </div>
+      <div class="feature-card card reveal reveal-delay-1">
+        <div class="feature-icon">🅿️</div>
+        <h3>Smart Parking Integration</h3>
+        <p>Real-time parking occupancy feeds reduce search-for-parking traffic by up to 30%, guiding drivers to available spaces instantly.</p>
+        <div class="feature-tag">IoT INTEGRATION</div>
+      </div>
+      <div class="feature-card card reveal reveal-delay-2">
+        <div class="feature-icon">🗺️</div>
+        <h3>Route Optimization</h3>
+        <p>GIS-powered routing engine delivers live rerouting recommendations to navigation apps and dynamic message signs city-wide.</p>
+        <div class="feature-tag">GIS · 5G</div>
+      </div>
+      <div class="feature-card card reveal reveal-delay-3">
+        <div class="feature-icon">🌿</div>
+        <h3>Environmental Impact Monitoring</h3>
+        <p>Integrated air quality and noise sensors correlate traffic flow with CO₂ and particulate emissions for sustainability reporting.</p>
+        <div class="feature-tag">SUSTAINABILITY</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">System Architecture</p>
+    <h2 class="section-title reveal">Connected Infrastructure<br>at City Scale</h2>
+    <p class="section-desc reveal">Every component from roadside sensor to cloud inference pipeline is designed for low-latency, high-availability urban operation.</p>
+    <div class="arch-container reveal" style="margin-top:2.5rem;">
+      <div class="arch-svg-wrap">
+        <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-height:260px;">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="rgba(0,212,255,0.6)"/>
+            </marker>
+            <filter id="nodeGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <!-- Row 1: Edge layer -->
+          <!-- IoT Sensor -->
+          <g transform="translate(30,30)">
+            <rect width="110" height="56" rx="10" fill="rgba(0,212,255,0.08)" stroke="#00D4FF" stroke-width="1.5" filter="url(#nodeGlow)"/>
+            <text x="55" y="22" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="700">IoT Sensors</text>
+            <text x="55" y="37" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">1,200+ Nodes</text>
+            <text x="55" y="50" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">EDGE LAYER</text>
+          </g>
+          <!-- Cameras -->
+          <g transform="translate(170,30)">
+            <rect width="110" height="56" rx="10" fill="rgba(0,212,255,0.08)" stroke="#00D4FF" stroke-width="1.5"/>
+            <text x="55" y="22" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="700">CCTV Cameras</text>
+            <text x="55" y="37" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">HD + Thermal</text>
+            <text x="55" y="50" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">CV LAYER</text>
+          </g>
+          <!-- Edge Compute -->
+          <g transform="translate(310,30)">
+            <rect width="120" height="56" rx="10" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.5)" stroke-width="1"/>
+            <text x="60" y="22" text-anchor="middle" fill="#7ACFFF" font-family="Space Grotesk" font-size="11" font-weight="600">Edge Compute</text>
+            <text x="60" y="37" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Local Inference</text>
+            <text x="60" y="50" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">NVIDIA Jetson</text>
+          </g>
+          <!-- 5G Gateway -->
+          <g transform="translate(460,30)">
+            <rect width="110" height="56" rx="10" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.5)" stroke-width="1"/>
+            <text x="55" y="22" text-anchor="middle" fill="#7ACFFF" font-family="Space Grotesk" font-size="11" font-weight="600">5G Gateway</text>
+            <text x="55" y="37" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Low-latency TX</text>
+            <text x="55" y="50" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">&lt;10ms RTT</text>
+          </g>
+          <!-- Vehicles -->
+          <g transform="translate(600,30)">
+            <rect width="125" height="56" rx="10" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.5)" stroke-width="1"/>
+            <text x="63" y="22" text-anchor="middle" fill="#7ACFFF" font-family="Space Grotesk" font-size="11" font-weight="600">Connected Vehicles</text>
+            <text x="63" y="37" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">V2X Comms</text>
+            <text x="63" y="50" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">C-V2X Protocol</text>
+          </g>
+
+          <!-- Middle: Cloud Platform -->
+          <g transform="translate(220,140)">
+            <rect width="320" height="65" rx="12" fill="rgba(0,255,136,0.07)" stroke="#00FF88" stroke-width="1.5" filter="url(#nodeGlow)"/>
+            <text x="160" y="22" text-anchor="middle" fill="#00FF88" font-family="Space Grotesk" font-size="13" font-weight="700">Cloud Platform</text>
+            <text x="80" y="40" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">AI Analytics Engine</text>
+            <text x="160" y="40" text-anchor="middle" fill="#4A6580" font-family="Inter" font-size="9">·</text>
+            <text x="240" y="40" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Big Data Pipeline</text>
+            <text x="80" y="55" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">TensorFlow · Kafka</text>
+            <text x="240" y="55" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">Spark · PostgreSQL</text>
+          </g>
+
+          <!-- Bottom Row -->
+          <!-- Traffic Control Center -->
+          <g transform="translate(30,255)">
+            <rect width="145" height="50" rx="10" fill="rgba(0,212,255,0.08)" stroke="#00D4FF" stroke-width="1.5"/>
+            <text x="73" y="21" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="700">Traffic Control Ctr</text>
+            <text x="73" y="36" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Signal Management</text>
+            <text x="73" y="48" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">SCOOT · SCATS</text>
+          </g>
+          <!-- Mobile App -->
+          <g transform="translate(210,255)">
+            <rect width="140" height="50" rx="10" fill="rgba(0,212,255,0.08)" stroke="#00D4FF" stroke-width="1.5"/>
+            <text x="70" y="21" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="700">Mobile Application</text>
+            <text x="70" y="36" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Commuter Routing</text>
+            <text x="70" y="48" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">iOS · Android</text>
+          </g>
+          <!-- Operator Dashboard -->
+          <g transform="translate(380,255)">
+            <rect width="160" height="50" rx="10" fill="rgba(0,212,255,0.08)" stroke="#00D4FF" stroke-width="1.5"/>
+            <text x="80" y="21" text-anchor="middle" fill="#00D4FF" font-family="Space Grotesk" font-size="11" font-weight="700">Operator Dashboard</text>
+            <text x="80" y="36" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Web GIS Interface</text>
+            <text x="80" y="48" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">React · MapboxGL</text>
+          </g>
+          <!-- Emergency Services -->
+          <g transform="translate(570,255)">
+            <rect width="155" height="50" rx="10" fill="rgba(255,71,87,0.08)" stroke="rgba(255,71,87,0.5)" stroke-width="1"/>
+            <text x="78" y="21" text-anchor="middle" fill="#FF6B7A" font-family="Space Grotesk" font-size="11" font-weight="700">Emergency Services</text>
+            <text x="78" y="36" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="9">Priority Corridors</text>
+            <text x="78" y="48" text-anchor="middle" fill="#4A6580" font-family="Space Mono" font-size="8">Auto Green-Wave</text>
+          </g>
+
+          <!-- Edge to Cloud lines -->
+          <line x1="85" y1="86" x2="290" y2="140" stroke="rgba(0,212,255,0.35)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrowSmall)"/>
+          <line x1="225" y1="86" x2="310" y2="140" stroke="rgba(0,212,255,0.35)" stroke-width="1.2" stroke-dasharray="4,3"/>
+          <line x1="370" y1="86" x2="370" y2="140" stroke="rgba(0,212,255,0.35)" stroke-width="1.2" stroke-dasharray="4,3"/>
+          <line x1="515" y1="86" x2="440" y2="140" stroke="rgba(0,212,255,0.35)" stroke-width="1.2" stroke-dasharray="4,3"/>
+          <line x1="662" y1="86" x2="490" y2="140" stroke="rgba(0,212,255,0.25)" stroke-width="1.2" stroke-dasharray="4,3"/>
+
+          <!-- Cloud to bottom -->
+          <line x1="290" y1="205" x2="103" y2="255" stroke="rgba(0,255,136,0.4)" stroke-width="1.5" marker-end="url(#arrowSmall)"/>
+          <line x1="330" y1="205" x2="280" y2="255" stroke="rgba(0,255,136,0.4)" stroke-width="1.5"/>
+          <line x1="380" y1="205" x2="460" y2="255" stroke="rgba(0,255,136,0.4)" stroke-width="1.5"/>
+          <line x1="490" y1="205" x2="648" y2="255" stroke="rgba(0,255,136,0.3)" stroke-width="1.5"/>
+
+          <!-- Animated Data Packets -->
+          <circle r="3.5" fill="#00D4FF" opacity="0.9" filter="url(#nodeGlow)">
+            <animateMotion dur="2.2s" repeatCount="indefinite">
+              <mpath href="#archPath1"/>
+            </animateMotion>
+          </circle>
+          <path id="archPath1" d="M85,86 L290,140 L330,205 L280,255" fill="none"/>
+
+          <circle r="3.5" fill="#00FF88" opacity="0.9" filter="url(#nodeGlow)">
+            <animateMotion dur="2.8s" repeatCount="indefinite" begin="0.6s">
+              <mpath href="#archPath2"/>
+            </animateMotion>
+          </circle>
+          <path id="archPath2" d="M515,86 L440,140 L490,205 L648,255" fill="none"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE DASHBOARD -->
+<section id="dashboard">
+  <div class="section-inner">
+    <div class="dashboard-header">
+      <div>
+        <p class="section-eyebrow">Live Telemetry</p>
+        <h2 class="section-title" style="margin-bottom:0">Operational Dashboard</h2>
+      </div>
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        LIVE — Updated Every 5s
+      </div>
+    </div>
+    <!-- Metric Cards -->
+    <div class="dashboard-grid">
+      <div class="metric-card reveal reveal-delay-1">
+        <div class="metric-label">Traffic Density</div>
+        <div><span class="metric-value" id="m-density">78</span><span class="metric-unit">veh/km</span></div>
+        <div class="metric-trend trend-ok" id="t-density">↑ Moderate</div>
+      </div>
+      <div class="metric-card reveal reveal-delay-2">
+        <div class="metric-label">Avg Vehicle Speed</div>
+        <div><span class="metric-value" id="m-speed">34</span><span class="metric-unit">km/h</span></div>
+        <div class="metric-trend trend-up" id="t-speed">▲ +6 from last hour</div>
+      </div>
+      <div class="metric-card reveal reveal-delay-3">
+        <div class="metric-label">Congestion Level</div>
+        <div><span class="metric-value" id="m-cong" style="color:var(--amber)">Medium</span></div>
+        <div class="metric-trend trend-ok">Zone C · Highway 12</div>
+      </div>
+      <div class="metric-card reveal reveal-delay-4">
+        <div class="metric-label">Air Quality Index</div>
+        <div><span class="metric-value" id="m-aqi" style="color:var(--green)">62</span><span class="metric-unit">AQI</span></div>
+        <div class="metric-trend trend-up" id="t-aqi">↓ Good</div>
+      </div>
+      <div class="metric-card reveal reveal-delay-5">
+        <div class="metric-label">Active Signals</div>
+        <div><span class="metric-value" id="m-signals">184</span><span class="metric-unit">/ 200</span></div>
+        <div class="metric-trend trend-up">92% Operational</div>
+      </div>
+      <div class="metric-card reveal reveal-delay-1">
+        <div class="metric-label">Emergency Alerts</div>
+        <div><span class="metric-value" id="m-alerts" style="color:var(--red)">2</span><span class="metric-unit">active</span></div>
+        <div class="metric-trend trend-dn">⚠ Ambulance · Police</div>
+      </div>
+    </div>
+    <!-- Charts -->
+    <div class="chart-row">
+      <div class="chart-card reveal">
+        <h4>Traffic Volume — Last 12 Hours</h4>
+        <div class="chart-wrap"><canvas id="trafficChart"></canvas></div>
+      </div>
+      <div class="chart-card reveal reveal-delay-2">
+        <h4>Congestion Distribution</h4>
+        <div class="doughnut-wrap"><canvas id="congChart"></canvas></div>
+      </div>
+    </div>
+    <!-- Alerts -->
+    <div class="alert-row" style="margin-top:1.5rem;">
+      <div class="alert-item" style="border-color:rgba(255,71,87,0.3);">
+        <div class="alert-icon">🚑</div>
+        <div>
+          <div class="alert-text" style="color:var(--red)">Ambulance Enroute</div>
+          <div class="alert-time">Green wave: NH-48 → City Hospital · 2 min ETA</div>
+        </div>
+      </div>
+      <div class="alert-item" style="border-color:rgba(255,181,71,0.3);">
+        <div class="alert-icon">⚠️</div>
+        <div>
+          <div class="alert-text" style="color:var(--amber)">Incident Detected</div>
+          <div class="alert-time">Minor collision · Ring Road Jn · Sec 3</div>
+        </div>
+      </div>
+      <div class="alert-item" style="border-color:rgba(0,255,136,0.2);">
+        <div class="alert-icon">🅿️</div>
+        <div>
+          <div class="alert-text" style="color:var(--green)">Parking Update</div>
+          <div class="alert-time">42 spaces free · Central Plaza</div>
+        </div>
+      </div>
+      <div class="alert-item">
+        <div class="alert-icon">🌿</div>
+        <div>
+          <div class="alert-text">Air Quality: Good</div>
+          <div class="alert-time">PM2.5: 28µg/m³ · CO₂: 412ppm</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BENEFITS -->
+<section id="benefits">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">Measured Outcomes</p>
+    <h2 class="section-title reveal">Real Impact,<br>Real Numbers</h2>
+    <p class="section-desc reveal">Pilot deployments across six metropolitan areas confirm measurable, sustained improvements in traffic efficiency, safety, and air quality.</p>
+    <div class="kpi-grid">
+      <div class="kpi-card reveal reveal-delay-1">
+        <span class="kpi-icon">🚗</span>
+        <span class="kpi-num" data-count="30" data-suffix="%">0%</span>
+        <div class="kpi-desc">Reduction in peak-hour congestion across instrumented corridors</div>
+      </div>
+      <div class="kpi-card reveal reveal-delay-2">
+        <span class="kpi-icon">⛽</span>
+        <span class="kpi-num" data-count="25" data-suffix="%">0%</span>
+        <div class="kpi-desc">Lower fuel consumption per vehicle trip through the network</div>
+      </div>
+      <div class="kpi-card reveal reveal-delay-3">
+        <span class="kpi-icon">🌿</span>
+        <span class="kpi-num" data-count="20" data-suffix="%">0%</span>
+        <div class="kpi-desc">Reduction in CO₂ and particulate emissions in monitored zones</div>
+      </div>
+      <div class="kpi-card reveal reveal-delay-4">
+        <span class="kpi-icon">🚨</span>
+        <span class="kpi-num" data-count="40" data-suffix="%">0%</span>
+        <div class="kpi-desc">Faster average emergency vehicle response via priority corridors</div>
+      </div>
+      <div class="kpi-card reveal reveal-delay-5">
+        <span class="kpi-icon">🕐</span>
+        <span class="kpi-num" data-count="35" data-suffix="%">0%</span>
+        <div class="kpi-desc">Reduction in intersection wait times with adaptive signal control</div>
+      </div>
+      <div class="kpi-card reveal reveal-delay-1">
+        <span class="kpi-icon">😊</span>
+        <span class="kpi-num" data-count="92" data-suffix="%">0%</span>
+        <div class="kpi-desc">Commuter satisfaction rating in post-pilot user surveys</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section id="tech">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">Technology Stack</p>
+    <h2 class="section-title reveal">Powered by Next-Gen<br>Infrastructure</h2>
+    <div class="tech-grid">
+      <div class="tech-card reveal reveal-delay-1">
+        <span class="tech-icon">🤖</span>
+        <h4>Artificial Intelligence</h4>
+        <p>Deep learning, LSTM networks, and reinforcement learning for real-time decision making</p>
+      </div>
+      <div class="tech-card reveal reveal-delay-2">
+        <span class="tech-icon">📈</span>
+        <h4>Machine Learning</h4>
+        <p>Predictive models trained on 5+ years of city-specific traffic data using TensorFlow</p>
+      </div>
+      <div class="tech-card reveal reveal-delay-3">
+        <span class="tech-icon">📡</span>
+        <h4>IoT</h4>
+        <p>MQTT-based sensor mesh with 1,200+ distributed edge nodes and sub-100ms polling</p>
+      </div>
+      <div class="tech-card reveal reveal-delay-4">
+        <span class="tech-icon">👁️</span>
+        <h4>Computer Vision</h4>
+        <p>YOLOv8 object detection for vehicle classification, incident detection, and occupancy</p>
+      </div>
+      <div class="tech-card reveal reveal-delay-5">
+        <span class="tech-icon">☁️</span>
+        <h4>Cloud Computing</h4>
+        <p>Kubernetes-orchestrated microservices on hybrid cloud with 99.99% SLA guarantee</p>
+      </div>
+      <div class="tech-card reveal reveal-delay-1">
+        <span class="tech-icon">🗄️</span>
+        <h4>Big Data Analytics</h4>
+        <p>Apache Kafka + Spark streaming processes 2M+ events/second across the city network</p>
+      </div>
+      <div class="tech-card reveal reveal-delay-2">
+        <span class="tech-icon">📶</span>
+        <h4>5G Connectivity</h4>
+        <p>Ultra-low latency C-V2X communication between vehicles, infrastructure, and control centers</p>
+      </div>
+      <div class="tech-card reveal reveal-delay-3">
+        <span class="tech-icon">🗺️</span>
+        <h4>GIS Mapping</h4>
+        <p>MapboxGL + PostGIS for spatial analysis, route optimization, and real-time map rendering</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section id="usecases">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">Deployments</p>
+    <h2 class="section-title reveal">Designed for Every<br>Urban Environment</h2>
+    <div class="uc-grid">
+      <div class="uc-card reveal reveal-delay-1">
+        <span class="uc-icon">🏙️</span>
+        <h3>Smart Cities</h3>
+        <p>End-to-end traffic intelligence across all city districts, integrating with existing smart city data lakes and municipal systems.</p>
+      </div>
+      <div class="uc-card reveal reveal-delay-2">
+        <span class="uc-icon">🛣️</span>
+        <h3>Highways & Freeways</h3>
+        <p>Dynamic variable speed limits, lane management, and incident detection on expressways handling 80,000+ vehicles per day.</p>
+      </div>
+      <div class="uc-card reveal reveal-delay-3">
+        <span class="uc-icon">🌆</span>
+        <h3>Metropolitan Areas</h3>
+        <p>Multi-jurisdictional coordination for cross-boundary traffic flows, ensuring seamless management across city limits.</p>
+      </div>
+      <div class="uc-card reveal reveal-delay-4">
+        <span class="uc-icon">🏭</span>
+        <h3>Industrial Zones</h3>
+        <p>Heavy vehicle priority management, shift-change surge handling, and freight corridor optimization for industrial parks.</p>
+      </div>
+      <div class="uc-card reveal reveal-delay-5">
+        <span class="uc-icon">🎓</span>
+        <h3>University Campuses</h3>
+        <p>Pedestrian-vehicle conflict zone management, event-mode traffic handling, and safe routing for campus-wide mobility.</p>
+      </div>
+      <div class="uc-card reveal reveal-delay-1">
+        <span class="uc-icon">✈️</span>
+        <h3>Airport Traffic Management</h3>
+        <p>Terminal curbside queuing, ground transportation optimization, and departure-time-aware signal control for airports.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">Future Enhancements</p>
+    <h2 class="section-title reveal">What's Next</h2>
+    <p class="section-desc reveal">Our development roadmap focuses on integrating emerging technologies to stay ahead of evolving urban mobility needs.</p>
+    <div class="roadmap-track">
+      <div class="roadmap-item reveal reveal-delay-1">
+        <div class="roadmap-dot"><div class="roadmap-dot-inner"></div></div>
+        <div class="roadmap-body">
+          <div class="roadmap-phase">Phase 1 — Q3 2026</div>
+          <h4>Autonomous Vehicle Integration</h4>
+          <p>V2X communication protocols enabling STMU to directly orchestrate autonomous vehicle routing, platooning, and intersection negotiation without human intervention.</p>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-2">
+        <div class="roadmap-dot"><div class="roadmap-dot-inner" style="border-color:var(--green)"></div></div>
+        <div class="roadmap-body">
+          <div class="roadmap-phase" style="color:var(--green)">Phase 2 — Q1 2027</div>
+          <h4>Digital Twin Traffic Simulation</h4>
+          <p>A live 3D digital twin of the city's road network allowing operators to simulate interventions, test signal plans, and forecast event impacts before deploying changes.</p>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-3">
+        <div class="roadmap-dot"><div class="roadmap-dot-inner"></div></div>
+        <div class="roadmap-body">
+          <div class="roadmap-phase">Phase 3 — Q3 2027</div>
+          <h4>Predictive Urban Planning Analytics</h4>
+          <p>Long-horizon AI models that inform city planners about infrastructure bottlenecks years in advance, optimizing investment decisions for roads, transit, and zoning.</p>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-4">
+        <div class="roadmap-dot"><div class="roadmap-dot-inner" style="border-color:var(--green)"></div></div>
+        <div class="roadmap-body">
+          <div class="roadmap-phase" style="color:var(--green)">Phase 4 — Q1 2028</div>
+          <h4>Smart Public Transport Coordination</h4>
+          <p>Real-time bus and tram signal priority integrated with GTFS-RT feeds, enabling dynamic transit lanes and coordinated intermodal transfers at key nodes.</p>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-5">
+        <div class="roadmap-dot"><div class="roadmap-dot-inner"></div></div>
+        <div class="roadmap-body">
+          <div class="roadmap-phase">Phase 5 — Q3 2028</div>
+          <h4>AI-Based Incident Forecasting</h4>
+          <p>Probabilistic risk models combining weather, event calendars, historical patterns, and live telemetry to predict and proactively prevent incidents before they occur.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">Get in Touch</p>
+    <h2 class="section-title reveal">Ready to Transform<br>Your City?</h2>
+    <div class="contact-layout">
+      <div class="contact-info reveal">
+        <h3>Talk to Our Smart City Team</h3>
+        <p>Whether you're a municipal authority, transport agency, or smart city integrator, our team can walk you through a tailored deployment plan and ROI model for your specific context.</p>
+        <div class="contact-item">
+          <div class="contact-item-icon">📧</div>
+          <div class="contact-item-text">
+            <div class="label">Email</div>
+            <div class="value">hello@stmu-traffic.io</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-item-icon">📞</div>
+          <div class="contact-item-text">
+            <div class="label">Phone</div>
+            <div class="value">+91 (422) 000-0000</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-item-icon">📍</div>
+          <div class="contact-item-text">
+            <div class="label">Headquarters</div>
+            <div class="value">Smart City Hub, Coimbatore, TN</div>
+          </div>
+        </div>
+        <div class="contact-map">
+          <svg viewBox="0 0 400 160" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+            <!-- Grid lines -->
+            <defs>
+              <pattern id="mapGrid" width="30" height="30" patternUnits="userSpaceOnUse">
+                <path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(0,212,255,0.07)" stroke-width="1"/>
+              </pattern>
+            </defs>
+            <rect width="400" height="160" fill="var(--bg-secondary)"/>
+            <rect width="400" height="160" fill="url(#mapGrid)"/>
+            <!-- Simulated roads -->
+            <line x1="0" y1="80" x2="400" y2="80" stroke="rgba(0,212,255,0.2)" stroke-width="3"/>
+            <line x1="200" y1="0" x2="200" y2="160" stroke="rgba(0,212,255,0.2)" stroke-width="3"/>
+            <line x1="0" y1="40" x2="400" y2="40" stroke="rgba(0,212,255,0.1)" stroke-width="1"/>
+            <line x1="0" y1="120" x2="400" y2="120" stroke="rgba(0,212,255,0.1)" stroke-width="1"/>
+            <line x1="100" y1="0" x2="100" y2="160" stroke="rgba(0,212,255,0.1)" stroke-width="1"/>
+            <line x1="300" y1="0" x2="300" y2="160" stroke="rgba(0,212,255,0.1)" stroke-width="1"/>
+            <!-- Signal dots -->
+            <circle cx="200" cy="80" r="8" fill="rgba(0,255,136,0.3)" stroke="#00FF88" stroke-width="2">
+              <animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="200" cy="80" r="4" fill="#00FF88"/>
+            <circle cx="100" cy="80" r="4" fill="#00D4FF" opacity="0.7"/>
+            <circle cx="300" cy="80" r="4" fill="#00D4FF" opacity="0.7"/>
+            <circle cx="200" cy="40" r="4" fill="#00D4FF" opacity="0.7"/>
+            <circle cx="200" cy="120" r="4" fill="#00D4FF" opacity="0.7"/>
+            <text x="200" y="100" text-anchor="middle" fill="#7A9AB8" font-family="Inter" font-size="10">Coimbatore, TN</text>
+          </svg>
+        </div>
+      </div>
+      <div class="reveal reveal-delay-2">
+        <div class="card" style="padding:2rem;">
+          <div class="contact-form" id="contactForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="fname">First Name</label>
+                <input type="text" id="fname" placeholder="Arjun">
+              </div>
+              <div class="form-group">
+                <label for="lname">Last Name</label>
+                <input type="text" id="lname" placeholder="Kumar">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="email">Email Address</label>
+              <input type="email" id="email" placeholder="arjun@municipal.gov.in">
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone Number</label>
+              <input type="tel" id="phone" placeholder="+91 98765 43210">
+            </div>
+            <div class="form-group">
+              <label for="org">Organisation Type</label>
+              <select id="org">
+                <option value="">Select type...</option>
+                <option>Municipal Authority</option>
+                <option>Transport Agency</option>
+                <option>Smart City Integrator</option>
+                <option>Research Institution</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="message">Message</label>
+              <textarea id="message" placeholder="Tell us about your city's traffic challenges and what you're looking to achieve..."></textarea>
+            </div>
+            <button class="btn-primary" style="width:100%;justify-content:center;" onclick="submitForm()">
+              Send Message →
+            </button>
+          </div>
+          <div id="formSuccess" style="display:none;text-align:center;padding:2rem 1rem;">
+            <div style="font-size:3rem;margin-bottom:1rem;">✅</div>
+            <h4 style="font-family:var(--font-display);font-size:1.2rem;margin-bottom:0.5rem;">Message Sent!</h4>
+            <p style="color:var(--text-secondary);font-size:0.9rem;">Our smart city team will be in touch within one business day.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <a href="#hero" class="nav-logo" style="font-size:1.4rem;">ST<span>MU</span></a>
+      <p>Smart Traffic Management for Urban Congestion — AI-powered, sensor-driven, and designed to make every city's mobility smarter, safer, and more sustainable.</p>
+      <div class="social-links">
+        <a href="#" class="social-link" aria-label="Twitter">𝕏</a>
+        <a href="#" class="social-link" aria-label="LinkedIn">in</a>
+        <a href="#" class="social-link" aria-label="GitHub">⌥</a>
+        <a href="#" class="social-link" aria-label="YouTube">▶</a>
+      </div>
+    </div>
+    <div class="footer-col">
+      <h5>Product</h5>
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#dashboard">Live Demo</a></li>
+        <li><a href="#tech">Technology</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Solutions</h5>
+      <ul>
+        <li><a href="#usecases">Smart Cities</a></li>
+        <li><a href="#usecases">Highways</a></li>
+        <li><a href="#usecases">Airports</a></li>
+        <li><a href="#usecases">Campuses</a></li>
+        <li><a href="#usecases">Industrial</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Company</h5>
+      <ul>
+        <li><a href="#contact">About</a></li>
+        <li><a href="#contact">Research</a></li>
+        <li><a href="#contact">Partnerships</a></li>
+        <li><a href="#contact">Careers</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2026 STMU Smart Traffic Systems. All rights reserved.</p>
+    <p><a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a> · <a href="#">Accessibility</a></p>
+  </div>
+</footer>
+
+<!-- ============================================
+   JAVASCRIPT
+   ============================================ -->
+<script>
+// ========== CITY CANVAS ==========
+const canvas = document.getElementById('cityCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H, nodes = [], particles = [];
+
+function resizeCanvas() {
+  W = canvas.width = canvas.offsetWidth;
+  H = canvas.height = canvas.offsetHeight;
+  initCity();
+}
+
+function initCity() {
+  nodes = [];
+  // Create a grid of intersection nodes
+  const cols = Math.ceil(W / 90) + 2;
+  const rows = Math.ceil(H / 80) + 2;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      nodes.push({
+        x: c * 90 - 40,
+        y: r * 80 - 30,
+        pulse: Math.random() * Math.PI * 2,
+        active: Math.random() > 0.35
+      });
+    }
+  }
+}
+
+function drawCity(t) {
+  ctx.clearRect(0, 0, W, H);
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const lineColor = isDark ? 'rgba(0,212,255,' : 'rgba(0,100,180,';
+  const nodeColor = isDark ? '#00D4FF' : '#006FBF';
+  const greenColor = isDark ? '#00FF88' : '#007A45';
+
+  const cols = Math.ceil(W / 90) + 2;
+
+  // Draw grid roads (horizontal & vertical)
+  ctx.lineWidth = 1;
+
+  // Horizontal lines
+  const rows = Math.ceil(H / 80) + 2;
+  for (let r = 0; r < rows; r++) {
+    const y = r * 80 - 30;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.strokeStyle = lineColor + '0.08)';
+    ctx.stroke();
+  }
+  // Vertical lines
+  for (let c = 0; c < cols; c++) {
+    const x = c * 90 - 40;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.strokeStyle = lineColor + '0.08)';
+    ctx.stroke();
+  }
+
+  // Draw glowing intersection nodes
+  nodes.forEach(n => {
+    if (!n.active) return;
+    n.pulse += 0.03;
+    const glow = (Math.sin(n.pulse) + 1) * 0.5;
+    const size = 2 + glow * 2;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, size, 0, Math.PI * 2);
+    ctx.fillStyle = isDark ? `rgba(0,212,255,${0.3 + glow * 0.5})` : `rgba(0,100,180,${0.25 + glow * 0.4})`;
+    ctx.fill();
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, size + 3, 0, Math.PI * 2);
+    ctx.strokeStyle = isDark ? `rgba(0,212,255,${0.1 + glow * 0.15})` : `rgba(0,100,180,${0.08 + glow * 0.12})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // Animate data packets along roads
+  if (Math.random() < 0.08) {
+    // Horizontal or vertical packet
+    const horiz = Math.random() > 0.5;
+    const r = Math.floor(Math.random() * Math.ceil(H / 80));
+    const c = Math.floor(Math.random() * cols);
+    particles.push({
+      x: horiz ? -10 : c * 90 - 40,
+      y: horiz ? r * 80 - 30 : -10,
+      dx: horiz ? (Math.random() > 0.5 ? 2.5 : -2.5) : 0,
+      dy: horiz ? 0 : (Math.random() > 0.5 ? 2 : -2),
+      life: 1,
+      color: Math.random() > 0.5 ? nodeColor : greenColor
+    });
+  }
+
+  particles = particles.filter(p => {
+    p.x += p.dx; p.y += p.dy; p.life -= 0.005;
+    if (p.life <= 0 || p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) return false;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life;
+    ctx.fill();
+    // Trail
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x - p.dx * 8, p.y - p.dy * 8);
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = p.life * 0.3;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    return true;
+  });
+}
+
+let animFrame;
+function animate(t) {
+  drawCity(t);
+  animFrame = requestAnimationFrame(animate);
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+animate(0);
+
+// ========== SCROLL REVEAL ==========
+const revealEls = document.querySelectorAll('.reveal');
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.1 });
+revealEls.forEach(el => revealObs.observe(el));
+
+// ========== COUNTER ANIMATION ==========
+function animateCounter(el) {
+  const target = parseInt(el.getAttribute('data-count'));
+  const suffix = el.getAttribute('data-suffix') || '';
+  const duration = 1800;
+  const start = performance.now();
+  function update(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(eased * target) + suffix;
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+// Hero stat counters
+const heroCounters = document.querySelectorAll('[data-count]');
+const heroObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      animateCounter(e.target);
+      heroObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.5 });
+heroCounters.forEach(c => heroObs.observe(c));
+
+// ========== PROGRESS BAR ==========
+const pb = document.getElementById('progress-bar');
+window.addEventListener('scroll', () => {
+  const scrollTop = window.scrollY;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  pb.style.width = (scrollTop / docHeight * 100) + '%';
+});
+
+// ========== THEME TOGGLE ==========
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('click', () => {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  themeToggle.textContent = isDark ? '🌙' : '☀️';
+  // Rebuild charts with new colors
+  setTimeout(initCharts, 100);
+});
+
+// ========== HAMBURGER ==========
+const hamburger = document.getElementById('hamburger');
+const mobileMenu = document.getElementById('mobileMenu');
+hamburger.addEventListener('click', () => {
+  mobileMenu.classList.toggle('open');
+});
+function closeMobile() { mobileMenu.classList.remove('open'); }
+
+// ========== STEP ITEMS INTERACTION ==========
+const stepItems = document.querySelectorAll('.step-item');
+stepItems.forEach((item, i) => {
+  item.addEventListener('click', () => {
+    stepItems.forEach(s => s.classList.remove('active'));
+    item.classList.add('active');
+  });
+});
+
+// ========== CHARTS ==========
+let trafficChartInst, congChartInst;
+
+function getChartColors() {
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  return {
+    cyan: isDark ? '#00D4FF' : '#006FBF',
+    green: isDark ? '#00FF88' : '#007A45',
+    amber: '#FFB547',
+    text: isDark ? '#7A9AB8' : '#3A5A80',
+    grid: isDark ? 'rgba(0,212,255,0.08)' : 'rgba(0,100,180,0.08)',
+    bg: isDark ? 'rgba(8,12,24,0)' : 'rgba(240,246,255,0)',
+  };
+}
+
+function initCharts() {
+  const c = getChartColors();
+
+  // Traffic volume line chart
+  const tCtx = document.getElementById('trafficChart').getContext('2d');
+  if (trafficChartInst) trafficChartInst.destroy();
+  const labels = ['00:00','02:00','04:00','06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00'];
+  const data1 = [210,145,120,380,820,760,680,710,880,920,640,310];
+  const data2 = [180,130,100,320,750,700,620,660,810,870,580,280];
+
+  trafficChartInst = new Chart(tCtx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Inbound',
+          data: data1,
+          borderColor: c.cyan,
+          backgroundColor: c.cyan + '18',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: c.cyan,
+          fill: true,
+          tension: 0.4
+        },
+        {
+          label: 'Outbound',
+          data: data2,
+          borderColor: c.green,
+          backgroundColor: c.green + '12',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: c.green,
+          fill: true,
+          tension: 0.4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: c.text, font: { family: 'Inter', size: 11 }, boxWidth: 12 } }
+      },
+      scales: {
+        x: { ticks: { color: c.text, font: { size: 10 } }, grid: { color: c.grid } },
+        y: { ticks: { color: c.text, font: { size: 10 } }, grid: { color: c.grid } }
+      }
+    }
+  });
+
+  // Congestion doughnut
+  const cCtx = document.getElementById('congChart').getContext('2d');
+  if (congChartInst) congChartInst.destroy();
+  congChartInst = new Chart(cCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Free Flow', 'Moderate', 'Heavy', 'Gridlock'],
+      datasets: [{
+        data: [42, 31, 20, 7],
+        backgroundColor: [c.green + 'CC', c.cyan + 'CC', c.amber + 'CC', '#FF4757CC'],
+        borderColor: [c.green, c.cyan, c.amber, '#FF4757'],
+        borderWidth: 1.5,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: c.text, font: { family: 'Inter', size: 10 }, boxWidth: 10, padding: 8 }
+        }
+      }
+    }
+  });
+}
+
+// Init charts when dashboard is visible
+const dashObs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { initCharts(); dashObs.disconnect(); } });
+}, { threshold: 0.1 });
+dashObs.observe(document.getElementById('dashboard'));
+
+// ========== LIVE DASHBOARD UPDATES ==========
+function randomBetween(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+
+function updateDashboard() {
+  const density = randomBetween(65, 95);
+  const speed = randomBetween(28, 48);
+  const aqi = randomBetween(45, 85);
+  const signals = randomBetween(180, 200);
+
+  document.getElementById('m-density').textContent = density;
+  document.getElementById('m-speed').textContent = speed;
+  document.getElementById('m-aqi').textContent = aqi;
+  document.getElementById('m-aqi').style.color = aqi < 50 ? 'var(--green)' : aqi < 70 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById('m-signals').textContent = signals;
+
+  const congLevels = ['Low','Medium','High','Critical'];
+  const congColors = ['var(--green)','var(--amber)','var(--red)','#FF0000'];
+  const ci = randomBetween(0,2);
+  const congEl = document.getElementById('m-cong');
+  congEl.textContent = congLevels[ci];
+  congEl.style.color = congColors[ci];
+
+  document.getElementById('t-density').textContent = density > 80 ? '↑ Heavy' : density > 65 ? '↑ Moderate' : '↓ Light';
+  document.getElementById('t-speed').textContent = speed > 40 ? '▲ Good flow' : '▼ Slowing';
+  document.getElementById('t-aqi').textContent = aqi < 50 ? '↓ Excellent' : aqi < 70 ? '→ Good' : '↑ Moderate';
+}
+
+setInterval(updateDashboard, 5000);
+
+// ========== CONTACT FORM ==========
+function submitForm() {
+  const fname = document.getElementById('fname').value;
+  const email = document.getElementById('email').value;
+  if (!fname || !email) {
+    alert('Please fill in at least your name and email.');
+    return;
+  }
+  document.getElementById('contactForm').style.display = 'none';
+  document.getElementById('formSuccess').style.display = 'block';
+}
+
+// ========== SMOOTH SCROLL for anchor links ==========
+document.querySelectorAll('a[href^="#"]').forEach(link => {
+  link.addEventListener('click', e => {
+    const target = document.querySelector(link.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+</body>
+</html>
